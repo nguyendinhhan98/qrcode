@@ -1,81 +1,116 @@
 <template>
   <div>
-    <label>Create QR code: </label>
-    <input type="text" v-model="qrcode" />
-    <qrcode-vue :value="qrcode"></qrcode-vue>
-    <p>
-      Last result: <b>{{ decodedContent }}</b>
+    <p class="decode-result">
+      Last result: <b>{{ result }}</b>
     </p>
 
-    <p class="error">
-      {{ errorMessage }}
-    </p>
+    <qrcode-stream :camera="camera" @decode="onDecode" @init="onInit">
+      <div v-if="validationSuccess" class="validation-success">
+        This is a URL
+      </div>
 
-    <qrcode-stream
-      v-if="isOpen"
-      @decode="onDecode"
-      @init="onInit"
-    ></qrcode-stream>
-    <button @click="openQR">Scan QR</button>
+      <div v-if="validationFailure" class="validation-failure">
+        This is NOT a URL!
+      </div>
+
+      <div v-if="validationPending" class="validation-pending">
+        <button>OK</button>
+        <button>NOT</button>
+      </div>
+    </qrcode-stream>
   </div>
 </template>
 
 <script>
 import { QrcodeStream } from "vue-qrcode-reader";
-import QrcodeVue from "qrcode.vue";
+
 export default {
-  components: { QrcodeStream, QrcodeVue },
+  components: { QrcodeStream },
 
   data() {
     return {
-      decodedContent: "",
-      errorMessage: "",
-      qrcode: "",
-      isOpen: false,
+      isValid: undefined,
+      camera: "auto",
+      result: null,
     };
   },
 
-  methods: {
-    onDecode(content) {
-      this.decodedContent = content;
-      // this.isOpen = false;
+  computed: {
+    validationPending() {
+      return this.isValid === undefined && this.camera === "off";
     },
 
-    onInit(promise) {
-      this.isOpen = true;
-      promise
-        .then(() => {
-          console.log("Successfully initilized! Ready for scanning now!");
-        })
-        .catch((error) => {
-          if (error.name === "NotAllowedError") {
-            this.errorMessage = "Hey! I need access to your camera";
-          } else if (error.name === "NotFoundError") {
-            this.errorMessage = "Do you even have a camera on your device?";
-          } else if (error.name === "NotSupportedError") {
-            this.errorMessage =
-              "Seems like this page is served in non-secure context (HTTPS, localhost or file://)";
-          } else if (error.name === "NotReadableError") {
-            this.errorMessage =
-              "Couldn't access your camera. Is it already in use?";
-          } else if (error.name === "OverconstrainedError") {
-            this.errorMessage =
-              "Constraints don't match any installed camera. Did you asked for the front camera although there is none?";
-          } else {
-            this.errorMessage = "UNKNOWN ERROR: " + error.message;
-          }
-        });
+    validationSuccess() {
+      return this.isValid === true;
     },
-    openQR() {
-      this.isOpen = !this.isOpen;
+
+    validationFailure() {
+      return this.isValid === false;
+    },
+  },
+
+  methods: {
+    onInit(promise) {
+      promise.catch(console.error).then(this.resetValidationState);
+    },
+
+    resetValidationState() {
+      this.isValid = undefined;
+    },
+
+    async onDecode(content) {
+      this.result = content;
+      this.turnCameraOff();
+
+      // pretend it's taking really long
+      await this.timeout(3000);
+      this.isValid = content.startsWith("http");
+
+      // some more delay, so users have time to read the message
+      await this.timeout(2000);
+
+      this.turnCameraOn();
+    },
+
+    turnCameraOn() {
+      this.camera = "auto";
+    },
+
+    turnCameraOff() {
+      this.camera = "off";
+    },
+
+    timeout(ms) {
+      return new Promise((resolve) => {
+        window.setTimeout(resolve, ms);
+      });
     },
   },
 };
 </script>
 
 <style scoped>
-.error {
+.validation-success,
+.validation-failure,
+.validation-pending {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+
+  background-color: rgba(255, 255, 255, 0.8);
+  text-align: center;
   font-weight: bold;
+  font-size: 1.4rem;
+  padding: 10px;
+
+  display: flex;
+  flex-flow: column nowrap;
+  justify-content: center;
+}
+.validation-success {
+  color: green;
+}
+.validation-failure {
   color: red;
 }
 </style>
