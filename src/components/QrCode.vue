@@ -1,5 +1,8 @@
 <template>
   <div>
+    <label>Create QR code: </label>
+    <input type="text" v-model="qrcode" />
+    <qrcode-vue :value="qrcode"></qrcode-vue>
     <p>
       Last result: <b>{{ decodedContent }}</b>
     </p>
@@ -8,29 +11,38 @@
       {{ errorMessage }}
     </p>
 
-    <qrcode-stream @decode="onDecode" @init="onInit"></qrcode-stream>
+    <qrcode-stream
+      v-if="isOpen"
+      @decode="onDecode"
+      @init="onInit"
+    ></qrcode-stream>
+    <button @click="openQR">Scan QR</button>
   </div>
 </template>
 
 <script>
 import { QrcodeStream } from "vue-qrcode-reader";
-
+import QrcodeVue from "qrcode.vue";
 export default {
-  components: { QrcodeStream },
+  components: { QrcodeStream, QrcodeVue },
 
   data() {
     return {
       decodedContent: "",
       errorMessage: "",
+      qrcode: "",
+      isOpen: false,
     };
   },
 
   methods: {
     onDecode(content) {
       this.decodedContent = content;
+      // this.isOpen = false;
     },
 
     onInit(promise) {
+      this.isOpen = true;
       promise
         .then(() => {
           console.log("Successfully initilized! Ready for scanning now!");
@@ -53,6 +65,9 @@ export default {
             this.errorMessage = "UNKNOWN ERROR: " + error.message;
           }
         });
+    },
+    openQR() {
+      this.isOpen = !this.isOpen;
     },
   },
 };
